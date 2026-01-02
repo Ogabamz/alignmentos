@@ -68,74 +68,88 @@ const Today: React.FC<{ store: ReturnType<typeof useStore> }> = ({ store }) => {
       <section>
         <h2 className="text-2xl font-black text-slate-800 mb-2">Morning Manifesto</h2>
         <p className="text-slate-500 text-sm leading-relaxed mb-6">
-          {allMissionsDone
-            ? "Victory! Ready for one more adventure?"
-            : activeAdventure
-              ? "Crush this ONE task to win the day."
-              : "What ONE task makes today a win?"}
+          "What ONE task makes today a win?"
         </p>
 
-        {(!activeAdventure) ? (
-          <form onSubmit={handleSetAdventure} className="relative group">
-            <input
-              type="text"
-              value={taskInput}
-              onChange={(e) => setTaskInput(e.target.value)}
-              placeholder={allMissionsDone ? "Next adventure..." : "Enter today's mission..."}
-              className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-5 py-5 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-all font-bold shadow-sm"
-            />
-            <button
-              type="submit"
-              className="absolute right-2 top-2 bottom-2 bg-slate-900 text-white px-8 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all active:scale-95"
+        {/* Mission List */}
+        <div className="space-y-4 mb-8">
+          {todaysTasks.map((adv) => (
+            <div
+              key={adv.id}
+              className={`rounded-3xl p-6 text-white shadow-xl relative overflow-hidden transition-all duration-500 ${adv.completed ? 'bg-emerald-600' : 'bg-slate-900 border-b-4 border-blue-600'
+                }`}
             >
-              DEPLOY
-            </button>
-          </form>
-        ) : (
-          <div className="bg-slate-900 rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden border-b-4 border-blue-600">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 opacity-20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-            <div className="relative z-10">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <span className="text-[10px] font-black tracking-widest text-blue-400 uppercase block mb-1">Active Mission</span>
-                  <div className="w-12 h-1 bg-blue-500 rounded-full"></div>
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-4">
+                  <span className={`text-[10px] font-black tracking-widest uppercase block ${adv.completed ? 'text-emerald-200' : 'text-blue-400'}`}>
+                    {adv.completed ? 'Victory Archive' : 'Active Mission'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      store.toggleAdventure(adv.id);
+                      if (!adv.completed) setIsTimerRunning(false);
+                    }}
+                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${adv.completed ? 'bg-white text-emerald-600 border-white' : 'border-slate-700 hover:border-blue-500'
+                      }`}
+                  >
+                    {adv.completed ? <span className="text-xs font-black">✓</span> : null}
+                  </button>
                 </div>
-                <button
-                  onClick={handleCompleteCurrent}
-                  className="group flex items-center gap-2 bg-white/10 hover:bg-green-500 px-4 py-2 rounded-xl transition-all border border-white/10"
-                >
-                  <span className="text-[10px] font-black uppercase tracking-tight">Complete Mission</span>
-                  <span className="text-lg">✓</span>
-                </button>
-              </div>
 
-              <h3 className="text-2xl font-bold mb-8 leading-tight">
-                {activeAdventure.task}
-              </h3>
+                <h3 className={`font-bold transition-all ${adv.completed
+                  ? 'text-base line-through opacity-70'
+                  : 'text-2xl leading-tight'
+                  }`}>
+                  {adv.task}
+                </h3>
 
-              <div className="flex items-end justify-between pt-4 border-t border-white/5">
-                <div className="flex gap-6">
-                  <div>
-                    <p className="text-slate-500 text-[8px] font-black uppercase tracking-wider mb-1">Focus Time</p>
-                    <p className="text-xl font-mono text-blue-400 font-bold">{activeAdventure.focusMinutes} <span className="text-[10px]">min</span></p>
+                {!adv.completed && (
+                  <div className="flex items-end justify-between mt-6 pt-4 border-t border-white/5">
+                    <div>
+                      <p className="text-slate-500 text-[8px] font-black uppercase tracking-wider mb-1">Focus Time</p>
+                      <p className="text-xl font-mono text-blue-400 font-bold">{adv.focusMinutes} <span className="text-[10px]">min</span></p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-slate-500 text-[8px] font-black uppercase tracking-wider mb-1">Status</p>
+                      <p className="text-[10px] font-black uppercase text-blue-400 bg-blue-500/10 px-2 py-1 rounded">Locked In</p>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-slate-500 text-[8px] font-black uppercase tracking-wider mb-1">Intensity</p>
-                  <p className="text-[10px] font-black uppercase text-white bg-blue-500/20 px-2 py-1 rounded">High Impact</p>
-                </div>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
+
+        {/* Deploy Form (Always show for the "Next" mission) */}
+        <form onSubmit={handleSetAdventure} className="relative group animate-in slide-in-from-bottom-5 duration-500">
+          <input
+            type="text"
+            value={taskInput}
+            onChange={(e) => setTaskInput(e.target.value)}
+            placeholder={todaysTasks.length > 0 ? "Deploy next mission..." : "Enter today's first mission..."}
+            className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-5 py-5 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-all font-bold shadow-sm"
+          />
+          <button
+            type="submit"
+            className="absolute right-2 top-2 bottom-2 bg-slate-900 text-white px-8 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-blue-600 transition-all active:scale-95"
+          >
+            DEPLOY
+          </button>
+        </form>
       </section>
 
       {activeAdventure && (
-        <section className="bg-blue-50 rounded-3xl p-8 text-center border-2 border-blue-100 relative">
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-100 text-blue-600 text-[10px] font-bold px-4 py-1 rounded-full border border-blue-200 uppercase tracking-widest">
+        <section className="bg-blue-50 rounded-3xl p-8 text-center border-2 border-blue-100 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-slate-200">
+            <div
+              className="h-full bg-blue-500 transition-all duration-1000"
+              style={{ width: `${(seconds / (25 * 60)) * 100}%` }}
+            ></div>
+          </div>
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-blue-100 text-blue-600 text-[10px] font-bold px-4 py-1 rounded-full border border-blue-200 uppercase tracking-widest">
             Deep Work Chamber
           </div>
-          <div className="text-7xl font-mono font-black text-slate-900 tracking-tighter mb-8 tabular-nums">
+          <div className="text-7xl font-mono font-black text-slate-900 tracking-tighter mb-8 tabular-nums pt-4">
             {formatTime(seconds)}
           </div>
           <div className="flex justify-center gap-4">
