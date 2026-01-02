@@ -19,6 +19,7 @@ export const supabaseService = {
         const { data, error } = await supabase
             .from('daily_adventures')
             .select('*')
+            .is('deleted_at', null)
             .order('created_at', { ascending: true });
 
         if (error) throw error;
@@ -63,7 +64,7 @@ export const supabaseService = {
     async deleteTask(id: string) {
         const { error } = await supabase
             .from('daily_adventures')
-            .delete()
+            .update({ deleted_at: new Date().toISOString() })
             .eq('id', id);
 
         if (error) throw error;
@@ -74,6 +75,7 @@ export const supabaseService = {
         const { data, error } = await supabase
             .from('financials')
             .select('*')
+            .is('deleted_at', null)
             .order('date', { ascending: false })
             .limit(50); // Valid limit
 
@@ -113,6 +115,7 @@ export const supabaseService = {
         const { data, error } = await supabase
             .from('quarterly_quests')
             .select('*')
+            .is('deleted_at', null)
             .limit(1)
             .single();
 
