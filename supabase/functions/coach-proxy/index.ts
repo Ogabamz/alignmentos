@@ -15,13 +15,16 @@ Deno.serve(async (req) => {
         const apiKey = Deno.env.get('GEMINI_API_KEY');
 
         if (!apiKey) {
-            console.error("DEBUG: GEMINI_API_KEY is missing from environment variables.");
-            throw new Error('GEMINI_API_KEY is not set in Supabase secrets');
+            return new Response(JSON.stringify({
+                error: 'GEMINI_API_KEY is missing in Supabase. Please go to Settings -> Edge Functions -> Add Secret.'
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 400,
+            });
         }
 
-        console.log("DEBUG: Calling Gemini 2.0 Flash...");
-
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
+        // Using 1.5-flash as it is more stable for the free tier (2.0-flash often shows limit 0)
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
 
         const geminiResponse = await fetch(apiUrl, {
             method: 'POST',
@@ -36,21 +39,23 @@ Deno.serve(async (req) => {
             })
         });
 
-        if (!geminiResponse.ok) {
-            const errorText = await geminiResponse.text();
-            console.error(`DEBUG: Gemini API Error (${geminiResponse.status}):`, errorText);
-            throw new Error(`Gemini API Error: ${geminiResponse.status}`);
-        }
-
         const data = await geminiResponse.json();
-        console.log("DEBUG: Gemini call successful.");
+
+        if (!geminiResponse.ok) {
+            return new Response(JSON.stringify({
+                error: `Gemini API Error (${geminiResponse.status})`,
+                details: data
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: geminiResponse.status,
+            });
+        }
 
         return new Response(JSON.stringify(data), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
         });
     } catch (error) {
-        console.error("DEBUG: Edge Function Exception:", error.message);
         return new Response(JSON.stringify({ error: error.message }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
