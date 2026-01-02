@@ -29,6 +29,12 @@ export const getCoachAdvice = async (state: AppState) => {
             throw new Error("Coach: No data returned from proxy.");
         }
 
+        // If the proxy returns an error within the 200 JSON
+        if (data.error) {
+            console.warn("Coach Proxy Diagnostic:", data.error);
+            return `Coach is having trouble: ${data.error}`;
+        }
+
         // The Edge Function returns the raw Gemini response
         return data.candidates?.[0]?.content?.parts?.[0]?.text || "Coach is meditating (No response text).";
 

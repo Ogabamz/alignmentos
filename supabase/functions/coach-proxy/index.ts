@@ -15,15 +15,14 @@ Deno.serve(async (req) => {
         const apiKey = Deno.env.get('GEMINI_API_KEY');
 
         if (!apiKey) {
-            return new Response(JSON.stringify({
-                error: 'GEMINI_API_KEY is missing in Supabase. Please go to Settings -> Edge Functions -> Add Secret.'
-            }), {
+            const msg = 'GEMINI_API_KEY is missing in Supabase. Please go to Settings -> Edge Functions -> Click "Manage Secrets" or look for the Secrets section and add GEMINI_API_KEY.';
+            console.error(msg);
+            return new Response(JSON.stringify({ error: msg }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 400,
+                status: 200, // Returning 200 so the frontend can read the JSON cleanly
             });
         }
 
-        // Using 1.5-flash as it is more stable for the free tier (2.0-flash often shows limit 0)
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent`;
 
         const geminiResponse = await fetch(apiUrl, {
@@ -47,7 +46,7 @@ Deno.serve(async (req) => {
                 details: data
             }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: geminiResponse.status,
+                status: 200, // Returning 200 for easier frontend debugging
             });
         }
 
@@ -58,7 +57,7 @@ Deno.serve(async (req) => {
     } catch (error) {
         return new Response(JSON.stringify({ error: error.message }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400,
+            status: 200,
         });
     }
 });
