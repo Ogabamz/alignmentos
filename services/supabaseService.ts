@@ -134,13 +134,34 @@ export const supabaseService = {
     },
 
     async updateQuest(quest: QuarterlyQuest) {
-        // Upsert logic: Update if exists, insert if not (based on a fixed logic or ID)
-        // For simplicity, we assume one row. We'll delete and re-insert or update generic.
-        // Easier: Update the single row found, or insert.
-
-        const { data: existing } = await supabase.from('quarterly_quests').select('id').single();
+        // If we are starting a new quest (onboarding), we should archive the existing one
+        const { data: existing } = await supabase
+            .from('quarterly_quests')
+            .select('id, status')
+            .is('deleted_at', null)
+            .maybeSingle();
 
         if (existing) {
+            // If the existing one is already COMPLETED and we are sending a new one, archive it
+            if (existing.status === 'COMPLETED' && quest.status !== 'COMPLETED') {
+                await supabase
+                    .from('quarterly_quests')
+                    .update({ deleted_at: new Date().toISOString() })
+                    .eq('id', existing.id);
+
+                // Now insert the new one
+                const { data, error } = await supabase.from('quarterly_quests').insert([{
+                    quarter: quest.quarter,
+                    business_outcome: quest.businessOutcome,
+                    revenue_target: quest.revenueTarget,
+                    personal_outcomes: quest.personalOutcomes,
+                    status: quest.status
+                }]).select().single();
+                if (error) throw error;
+                return data;
+            }
+
+            // Normal update (e.g. marking as completed or just editing)
             const { error } = await supabase
                 .from('quarterly_quests')
                 .update({
@@ -154,13 +175,15 @@ export const supabaseService = {
                 .eq('id', existing.id);
             if (error) throw error;
         } else {
-            await supabase.from('quarterly_quests').insert([{
+            const { data, error } = await supabase.from('quarterly_quests').insert([{
                 quarter: quest.quarter,
                 business_outcome: quest.businessOutcome,
                 revenue_target: quest.revenueTarget,
                 personal_outcomes: quest.personalOutcomes,
                 status: quest.status
-            }]);
+            }]).select().single();
+            if (error) throw error;
+            return data;
         }
     },
 

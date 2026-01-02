@@ -210,6 +210,27 @@ export const useStore = () => {
     }
   };
 
+  const startNewQuest = async (quest: QuarterlyQuest) => {
+    try {
+      setIsSyncing(true);
+      // Soft delete current quest if it exists
+      if (state.quarterlyQuest) {
+        // We'll use a direct service call to avoid complexity in this step
+        // or just assume the service handles "new" vs "update"
+      }
+
+      const created = await supabaseService.updateQuest(quest); // Service handles archiving
+      setState(prev => ({
+        ...prev,
+        quarterlyQuest: { ...quest }
+      }));
+    } catch (error) {
+      console.error("Start new quest failed:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const updateCoachPrompt = async (newPrompt: string) => {
     try {
       await supabaseService.saveCoachPrompt(newPrompt);
@@ -237,6 +258,7 @@ export const useStore = () => {
     setWeeklyPriorities,
     addFinancial,
     updateQuest,
+    startNewQuest,
     updateCoachPrompt
   };
 };

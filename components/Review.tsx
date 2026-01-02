@@ -29,13 +29,40 @@ const Review: React.FC<{ store: ReturnType<typeof useStore> }> = ({ store }) => 
   };
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-NG', { 
-      style: 'currency', 
-      currency: 'NGN', 
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0 
+      maximumFractionDigits: 0
     }).format(val);
   };
+
+  const [showQuestForm, setShowQuestForm] = useState(false);
+  const [newQuest, setNewQuest] = useState({
+    quarter: `Q${Math.floor(new Date().getMonth() / 3) + 1}-${new Date().getFullYear()}`,
+    businessOutcome: '',
+    revenueTarget: 0,
+    personalOutcomes: ['']
+  });
+
+  const handleCompleteMission = () => {
+    if (window.confirm("Mission Accomplished? This will archive your current goals and prepare for the next mission.")) {
+      store.updateQuest({ status: 'COMPLETED' });
+    }
+  };
+
+  const handleStartNewMission = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newQuest.businessOutcome && newQuest.revenueTarget > 0) {
+      store.startNewQuest({
+        ...newQuest,
+        status: 'ON_TRACK'
+      });
+      setShowQuestForm(false);
+    }
+  };
+
+  const isQuestActive = store.state.quarterlyQuest && store.state.quarterlyQuest.status !== 'COMPLETED';
 
   return (
     <div className="space-y-8 animate-in zoom-in-95 duration-500">
@@ -44,38 +71,147 @@ const Review: React.FC<{ store: ReturnType<typeof useStore> }> = ({ store }) => 
         <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Week {currentWeek.split('-W')[1]} Ritual</p>
       </header>
 
-      <div className="bg-blue-600 rounded-3xl p-6 text-white shadow-xl space-y-4">
-        <div>
-          <h3 className="text-xs font-black uppercase text-blue-200 mb-2 tracking-[0.2em]">Quarterly Quest Target</h3>
-          <p className="text-lg font-bold leading-tight mb-2">"{store.state.quarterlyQuest.businessOutcome}"</p>
-        </div>
+      {(!isQuestActive || showQuestForm) ? (
+        <div className="bg-slate-900 rounded-3xl p-8 text-white shadow-2xl relative overflow-hidden">
+          <div className="relative z-10 space-y-6">
+            <div>
+              <h3 className="text-sm font-black uppercase text-blue-400 mb-1 tracking-widest">Deploy New Mission</h3>
+              <p className="text-xs text-slate-400">Define your focus for the next season.</p>
+            </div>
 
-        {store.state.quarterlyQuest.personalOutcomes && store.state.quarterlyQuest.personalOutcomes.length > 0 && (
-          <div className="pt-2 border-t border-blue-500/30">
-            <h4 className="text-[10px] font-black uppercase text-blue-200 mb-2 tracking-widest">Personal Goals</h4>
-            <div className="space-y-1.5">
-              {store.state.quarterlyQuest.personalOutcomes.map((goal, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <span className="text-blue-300">★</span>
-                  <p className="text-xs font-semibold text-blue-50 leading-relaxed">{goal}</p>
+            <form onSubmit={handleStartNewMission} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-slate-500">Quarter</label>
+                  <input
+                    value={newQuest.quarter}
+                    onChange={e => setNewQuest({ ...newQuest, quarter: e.target.value })}
+                    className="w-full bg-slate-800 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
-              ))}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-slate-500">Revenue Goal (₦)</label>
+                  <input
+                    type="number"
+                    value={newQuest.revenueTarget}
+                    onChange={e => setNewQuest({ ...newQuest, revenueTarget: Number(e.target.value) })}
+                    className="w-full bg-slate-800 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-slate-500">Major Business Outcome</label>
+                <textarea
+                  value={newQuest.businessOutcome}
+                  onChange={e => setNewQuest({ ...newQuest, businessOutcome: e.target.value })}
+                  placeholder="e.g. Scale content distribution to 10k subscribers"
+                  className="w-full bg-slate-800 border-none rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold uppercase text-slate-500 block">Personal Outcomes (Internal Alignment)</label>
+                {newQuest.personalOutcomes.map((goal, i) => (
+                  <input
+                    key={i}
+                    value={goal}
+                    onChange={e => {
+                      const next = [...newQuest.personalOutcomes];
+                      next[i] = e.target.value;
+                      setNewQuest({ ...newQuest, personalOutcomes: next });
+                    }}
+                    placeholder={`Goal #${i + 1}`}
+                    className="w-full bg-slate-800 border-none rounded-xl p-3 text-xs font-semibold focus:ring-2 focus:ring-blue-500"
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setNewQuest({ ...newQuest, personalOutcomes: [...newQuest.personalOutcomes, ''] })}
+                  className="text-[10px] font-black text-blue-400 uppercase tracking-widest px-2"
+                >
+                  + Add Personal Goal
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-500/20 transition-all active:scale-95"
+              >
+                ACTIVATE MISSION
+              </button>
+
+              {store.state.quarterlyQuest.status === 'COMPLETED' && (
+                <button
+                  type="button"
+                  onClick={() => setShowQuestForm(false)}
+                  className="w-full text-slate-500 font-bold text-xs uppercase"
+                >
+                  Back to Achievement
+                </button>
+              )}
+            </form>
+          </div>
+        </div>
+      ) : (
+        <div className={`rounded-3xl p-6 text-white shadow-xl space-y-4 relative overflow-hidden transition-all duration-700 ${store.state.quarterlyQuest.status === 'COMPLETED' ? 'bg-emerald-600' : 'bg-blue-600'
+          }`}>
+          <div>
+            <h3 className="text-xs font-black uppercase text-blue-200 mb-2 tracking-[0.2em]">Quarterly Quest Target</h3>
+            <p className="text-lg font-bold leading-tight mb-2">"{store.state.quarterlyQuest.businessOutcome}"</p>
+          </div>
+
+          {store.state.quarterlyQuest.personalOutcomes && store.state.quarterlyQuest.personalOutcomes.length > 0 && (
+            <div className="pt-2 border-t border-blue-500/30">
+              <h4 className="text-[10px] font-black uppercase text-blue-200 mb-2 tracking-widest">Personal Goals</h4>
+              <div className="space-y-1.5">
+                {store.state.quarterlyQuest.personalOutcomes.map((goal, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <span className="text-blue-300">★</span>
+                    <p className="text-xs font-semibold text-blue-50 leading-relaxed">{goal}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center pt-2 border-t border-blue-500/30">
+            <div>
+              <p className="text-[10px] font-black text-blue-300 uppercase">Target: {formatCurrency(store.state.quarterlyQuest.revenueTarget)}</p>
+              <p className="text-[8px] font-bold text-blue-200/60 uppercase">{store.state.quarterlyQuest.quarter}</p>
+            </div>
+
+            <div className="flex gap-2">
+              {store.state.quarterlyQuest.status === 'COMPLETED' ? (
+                <button
+                  onClick={() => setShowQuestForm(true)}
+                  className="text-[10px] px-3 py-1 bg-white text-emerald-600 rounded-lg font-black uppercase shadow-lg"
+                >
+                  Next Mission
+                </button>
+              ) : (
+                <button
+                  onClick={handleCompleteMission}
+                  className="text-[10px] px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg font-black uppercase transition-all"
+                >
+                  Complete
+                </button>
+              )}
+              <span className={`text-[10px] px-2 py-1 rounded font-black uppercase ${store.state.quarterlyQuest.status === 'COMPLETED' ? 'bg-emerald-400 text-emerald-900' : 'bg-blue-500'
+                }`}>
+                {store.state.quarterlyQuest.status === 'COMPLETED' ? 'Victory' : 'Executing'}
+              </span>
             </div>
           </div>
-        )}
-
-        <div className="flex justify-between items-end pt-2 border-t border-blue-500/30">
-           <p className="text-[10px] font-black text-blue-300 uppercase">Target: {formatCurrency(store.state.quarterlyQuest.revenueTarget)}</p>
-           <span className="text-[10px] px-2 py-0.5 bg-blue-500 rounded font-bold uppercase">Executing</span>
         </div>
-      </div>
+      )}
 
       <div className="space-y-6">
         <section>
           <div className="flex justify-between items-center mb-4">
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">My Top 3 (This Week)</h4>
             {!myPriorities && !showForm && (
-              <button 
+              <button
                 onClick={() => setShowForm(true)}
                 className="text-[10px] font-bold text-blue-600 underline"
               >
@@ -98,7 +234,7 @@ const Review: React.FC<{ store: ReturnType<typeof useStore> }> = ({ store }) => 
             <div className="space-y-2">
               {myPriorities ? [myPriorities.priority1, myPriorities.priority2, myPriorities.priority3].map((p, i) => (
                 <div key={i} className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                  <span className="w-6 h-6 flex-shrink-0 bg-slate-900 text-white rounded-lg flex items-center justify-center text-[10px] font-black">{i+1}</span>
+                  <span className="w-6 h-6 flex-shrink-0 bg-slate-900 text-white rounded-lg flex items-center justify-center text-[10px] font-black">{i + 1}</span>
                   <p className="text-sm font-semibold text-slate-800">{p}</p>
                 </div>
               )) : (
@@ -127,7 +263,7 @@ const Review: React.FC<{ store: ReturnType<typeof useStore> }> = ({ store }) => 
             </div>
           ) : (
             <div className="bg-slate-50 p-8 rounded-3xl text-center">
-               <p className="text-slate-400 text-xs font-bold italic">Waiting for partner's input...</p>
+              <p className="text-slate-400 text-xs font-bold italic">Waiting for partner's input...</p>
             </div>
           )}
         </section>

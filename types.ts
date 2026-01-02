@@ -26,7 +26,7 @@ export interface QuarterlyQuest {
   businessOutcome: string;
   revenueTarget: number;
   personalOutcomes: string[];
-  status: 'ON_TRACK' | 'OFF_TRACK';
+  status: 'ON_TRACK' | 'OFF_TRACK' | 'COMPLETED';
 }
 
 export interface FinancialRecord {
