@@ -3,7 +3,11 @@ import { GoogleGenAI } from "@google/genai";
 import { AppState } from "../types";
 
 export const getCoachAdvice = async (state: AppState) => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+  // Force API version v1 for stable model access
+  const ai = new GoogleGenAI({
+    apiKey: import.meta.env.VITE_GEMINI_API_KEY,
+    apiVersion: 'v1'
+  });
 
   const husbandDaily = state.dailyAdventures.filter(a => a.userId === 'HUSBAND').slice(-5);
   const wifeDaily = state.dailyAdventures.filter(a => a.userId === 'WIFE').slice(-5);
@@ -20,7 +24,7 @@ export const getCoachAdvice = async (state: AppState) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-pro",
+      model: "gemini-1.5-flash",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         temperature: 0.8
@@ -30,6 +34,16 @@ export const getCoachAdvice = async (state: AppState) => {
     return response.text || "I can't see the full picture yet. Sync your data and log your daily adventures.";
   } catch (error) {
     console.error("AI Error:", error);
-    return "Coach is meditating. Sit down with your spouse and review your 'Top 3' for the week manually.";
+
+    // Debug: List available models if access fails
+    try {
+      console.log("Listing available models...");
+      const models = await ai.models.list();
+      console.log("Available Models:", models);
+    } catch (listError) {
+      console.error("Could not list models:", listError);
+    }
+
+    return "Coach is meditating. Please check the browser console for details.";
   }
 };
