@@ -16,8 +16,10 @@ export const getCoachAdvice = async (state: AppState) => {
         const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
         console.log("Using API Key:", apiKey ? "FOUND" : "MISSING");
 
-        // Fallback to gemini-1.5-flash which has a stable free tier
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // Try v1 endpoint as it is more stable for general models
+        const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -30,6 +32,8 @@ export const getCoachAdvice = async (state: AppState) => {
         });
 
         if (!response.ok) {
+            const errorBody = await response.text();
+            console.error("AI API ERROR BODY:", errorBody);
             throw new Error(`API Error: ${response.status} ${response.statusText}`);
         }
 
