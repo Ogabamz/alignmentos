@@ -31,8 +31,9 @@ export const getCoachAdvice = async (state: AppState) => {
 
         // If the proxy returns an error within the 200 JSON
         if (data.error) {
-            console.warn("Coach Proxy Diagnostic:", data.error);
-            return `Coach is having trouble: ${data.error}`;
+            console.warn("Coach Proxy Diagnostic:", data.error, data.details);
+            const detailMsg = data.details ? ` Details: ${JSON.stringify(data.details).slice(0, 100)}...` : '';
+            return `Coach is having trouble: ${data.error}.${detailMsg}`;
         }
 
         // The Edge Function returns the raw Gemini response
