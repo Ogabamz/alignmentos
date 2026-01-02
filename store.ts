@@ -1,11 +1,7 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AppState, UserRole, DailyAdventure, WeeklyPriority, FinancialRecord, QuarterlyQuest } from './types';
-
-const STORAGE_KEY = 'alignment_os_data';
-const SYNC_URL_KEY = 'alignment_os_sync_url';
-const PENDING_SYNC_KEY = 'alignment_os_pending_sync';
-const DEFAULT_SYNC_URL = 'https://script.google.com/macros/s/AKfycbyYC4BpzmNFs0pqJwWxZLn1PYzhssu8FqoK4ycV9fRcaVknotUhErgXtotP_pX1REjQmg/exec';
+import { supabaseService } from './services/supabaseService';
 
 const DEFAULT_COACH_PROMPT = `You are the Alignment Coach for a married founder couple. Your goal is visibility and focus.
 
@@ -43,20 +39,10 @@ const DEFAULT_STATE: AppState = {
 };
 
 export const useStore = () => {
-  const [state, setState] = useState<AppState>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : DEFAULT_STATE;
-  });
-
-  const [syncUrl, setSyncUrl] = useState<string>(() => {
-    return localStorage.getItem(SYNC_URL_KEY) || DEFAULT_SYNC_URL;
-  });
-
+  const [state, setState] = useState<AppState>(DEFAULT_STATE);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [hasPendingSync, setHasPendingSync] = useState(() => {
-    return localStorage.getItem(PENDING_SYNC_KEY) === 'true';
-  });
+  const [hasPendingSync] = useState(false); // Legacy field, simplified for Supabase
 
   // Track online status
   useEffect(() => {
@@ -70,172 +56,174 @@ export const useStore = () => {
     };
   }, []);
 
-  // Save state to local storage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
-
-  // Save pending sync status
-  useEffect(() => {
-    localStorage.setItem(PENDING_SYNC_KEY, String(hasPendingSync));
-  }, [hasPendingSync]);
-
-  const pushToCloud = useCallback(async (dataToPush: AppState) => {
-    if (!syncUrl || isOffline) return;
+  // Initial Load from Supabase
+  const loadAllData = useCallback(async () => {
     setIsSyncing(true);
     try {
-      await fetch(syncUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        body: JSON.stringify(dataToPush),
-      });
-      setHasPendingSync(false);
-    } catch (error) {
-      console.error("Push failed, will retry later:", error);
-      setHasPendingSync(true);
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [syncUrl, isOffline]);
+      const [tasks, financials, quest, coachPrompt] = await Promise.all([
+        supabaseService.loadTasks(),
+        supabaseService.loadFinancials(),
+        supabaseService.loadQuest(),
+        supabaseService.loadCoachPrompt()
+      ]);
 
-  const pullFromCloud = useCallback(async () => {
-    if (!syncUrl || isOffline || hasPendingSync) return;
-    
-    setIsSyncing(true);
-    try {
-      const response = await fetch(syncUrl, { cache: 'no-store' });
-      const cloudData = await response.json();
-      
-      if (cloudData && typeof cloudData === 'object' && cloudData.lastUpdated) {
-        if (cloudData.lastUpdated > state.lastUpdated) {
-          setState(prev => ({
-            ...cloudData,
-            user: prev.user,
-          }));
-        }
-      }
-    } catch (error) {
-      console.error("Pull failed:", error);
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [syncUrl, isOffline, hasPendingSync, state.lastUpdated]);
-
-  // Sync Loop
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (hasPendingSync) {
-        pushToCloud(state);
-      } else {
-        pullFromCloud();
-      }
-    }, 15000); 
-    return () => clearInterval(interval);
-  }, [hasPendingSync, pushToCloud, pullFromCloud, state]);
-
-  const updateStateAndSync = (updater: (prev: AppState) => AppState) => {
-    setState(prev => {
-      const newState = {
-        ...updater(prev),
+      setState(prev => ({
+        ...prev,
+        dailyAdventures: tasks.filter(t => t.type === 'DAILY' || !t.type),
+        weeklyPriorities: tasks.filter(t => t.type === 'WEEKLY') as any, // Temporary mapping
+        financials: financials as any,
+        quarterlyQuest: quest || prev.quarterlyQuest,
+        coachPrompt: coachPrompt || prev.coachPrompt,
         lastUpdated: Date.now()
-      };
-      setHasPendingSync(true);
-      pushToCloud(newState);
-      return newState;
-    });
-  };
+      }));
+    } catch (error) {
+      console.error("Failed to load data from Supabase:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
 
   const setUser = (user: UserRole) => setState(prev => ({ ...prev, user }));
 
-  const addDailyAdventure = (task: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    const newAdventure: DailyAdventure = {
-      id: crypto.randomUUID(),
-      userId: state.user,
-      date: today,
-      task,
-      completed: false,
-      focusMinutes: 0
-    };
-    updateStateAndSync(prev => ({
-      ...prev,
-      dailyAdventures: [...prev.dailyAdventures.filter(a => a.date !== today || a.userId !== state.user), newAdventure]
-    }));
+  const addDailyAdventure = async (task: string) => {
+    try {
+      const newTask = await supabaseService.addTask(task, state.user, 'DAILY');
+      setState(prev => ({
+        ...prev,
+        dailyAdventures: [
+          ...prev.dailyAdventures,
+          {
+            id: newTask.id,
+            userId: newTask.user_id,
+            date: newTask.date,
+            task: newTask.text,
+            completed: newTask.completed,
+            focusMinutes: 0
+          }
+        ]
+      }));
+    } catch (error) {
+      console.error("Add task failed:", error);
+    }
   };
 
-  const toggleAdventure = (id: string) => {
-    updateStateAndSync(prev => ({
-      ...prev,
-      dailyAdventures: prev.dailyAdventures.map(a => 
-        a.id === id ? { ...a, completed: !a.completed } : a
-      )
-    }));
+  const toggleAdventure = async (id: string) => {
+    try {
+      const task = state.dailyAdventures.find(a => a.id === id);
+      if (!task) return;
+      await supabaseService.toggleTask(id, !task.completed);
+      setState(prev => ({
+        ...prev,
+        dailyAdventures: prev.dailyAdventures.map(a =>
+          a.id === id ? { ...a, completed: !a.completed } : a
+        )
+      }));
+    } catch (error) {
+      console.error("Toggle task failed:", error);
+    }
   };
 
   const addFocusMinutes = (id: string, minutes: number) => {
-    updateStateAndSync(prev => ({
+    // Current Supabase schema doesn't have focusMinutes specifically, 
+    // we could add it, but for now we'll update state locally
+    setState(prev => ({
       ...prev,
-      dailyAdventures: prev.dailyAdventures.map(a => 
+      dailyAdventures: prev.dailyAdventures.map(a =>
         a.id === id ? { ...a, focusMinutes: a.focusMinutes + minutes } : a
       )
     }));
   };
 
-  const setWeeklyPriorities = (p1: string, p2: string, p3: string) => {
-    const week = getWeekString(new Date());
-    const newPriority: WeeklyPriority = {
-      id: crypto.randomUUID(),
-      userId: state.user,
-      week,
-      priority1: p1,
-      priority2: p2,
-      priority3: p3,
-      status: 'PENDING'
-    };
-    updateStateAndSync(prev => ({
-      ...prev,
-      weeklyPriorities: [...prev.weeklyPriorities.filter(p => p.week !== week || p.userId !== state.user), newPriority]
-    }));
+  const setWeeklyPriorities = async (p1: string, p2: string, p3: string) => {
+    try {
+      const combinedText = `${p1} | ${p2} | ${p3}`;
+      const newTask = await supabaseService.addTask(combinedText, state.user, 'WEEKLY');
+      const week = getWeekString(new Date());
+
+      const newPriority: WeeklyPriority = {
+        id: newTask.id,
+        userId: state.user,
+        week,
+        priority1: p1,
+        priority2: p2,
+        priority3: p3,
+        status: 'PENDING'
+      };
+
+      setState(prev => ({
+        ...prev,
+        weeklyPriorities: [...prev.weeklyPriorities.filter(p => p.week !== week || p.userId !== state.user), newPriority]
+      }));
+    } catch (error) {
+      console.error("Add weekly priority failed:", error);
+    }
   };
 
-  const addFinancial = (amount: number, type: 'INCOME' | 'EXPENSE', category: string, notes: string) => {
-    const newRecord: FinancialRecord = {
-      id: crypto.randomUUID(),
-      userId: state.user,
-      date: new Date().toISOString(),
-      amount,
-      type,
-      category,
-      notes
-    };
-    updateStateAndSync(prev => ({
-      ...prev,
-      financials: [...prev.financials, newRecord]
-    }));
+  const addFinancial = async (amount: number, type: 'INCOME' | 'EXPENSE', category: string, notes: string) => {
+    try {
+      const newRecord = await supabaseService.addFinancial({
+        userId: state.user,
+        date: new Date().toISOString().split('T')[0],
+        amount,
+        type,
+        category,
+        notes
+      });
+
+      setState(prev => ({
+        ...prev,
+        financials: [...prev.financials, {
+          id: newRecord.id,
+          userId: state.user,
+          date: newRecord.date,
+          amount,
+          type,
+          category,
+          notes
+        }]
+      }));
+    } catch (error) {
+      console.error("Add financial record failed:", error);
+    }
   };
 
-  const updateQuest = (updates: Partial<QuarterlyQuest>) => {
-    updateStateAndSync(prev => ({
-      ...prev,
-      quarterlyQuest: { ...prev.quarterlyQuest, ...updates }
-    }));
+  const updateQuest = async (updates: Partial<QuarterlyQuest>) => {
+    const newQuest = { ...state.quarterlyQuest, ...updates };
+    try {
+      await supabaseService.updateQuest(newQuest);
+      setState(prev => ({
+        ...prev,
+        quarterlyQuest: newQuest
+      }));
+    } catch (error) {
+      console.error("Update quest failed:", error);
+    }
   };
 
-  const updateCoachPrompt = (newPrompt: string) => {
-    updateStateAndSync(prev => ({
-      ...prev,
-      coachPrompt: newPrompt
-    }));
+  const updateCoachPrompt = async (newPrompt: string) => {
+    try {
+      await supabaseService.saveCoachPrompt(newPrompt);
+      setState(prev => ({
+        ...prev,
+        coachPrompt: newPrompt
+      }));
+    } catch (error) {
+      console.error("Save coach prompt failed:", error);
+    }
   };
 
   return {
     state,
-    syncUrl,
-    setSyncUrl,
+    syncUrl: "", // Legacy
+    setSyncUrl: () => { }, // Legacy
     isSyncing,
     isOffline,
     hasPendingSync,
-    pullFromCloud,
+    pullFromCloud: loadAllData,
     setUser,
     addDailyAdventure,
     toggleAdventure,
