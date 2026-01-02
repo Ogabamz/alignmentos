@@ -42,6 +42,7 @@ export const useStore = () => {
   const [state, setState] = useState<AppState>(DEFAULT_STATE);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [hasPendingSync] = useState(false); // Legacy field, simplified for Supabase
 
   // Track online status
@@ -58,6 +59,7 @@ export const useStore = () => {
 
   // Initial Load from Supabase
   const loadAllData = useCallback(async () => {
+    console.log("Supabase: Starting initial data load...");
     setIsSyncing(true);
     try {
       const [tasks, financials, quest, coachPrompt] = await Promise.all([
@@ -66,6 +68,8 @@ export const useStore = () => {
         supabaseService.loadQuest(),
         supabaseService.loadCoachPrompt()
       ]);
+
+      console.log(`Supabase: Loaded ${tasks.length} tasks and ${financials.length} financial records.`);
 
       setState(prev => ({
         ...prev,
@@ -76,8 +80,10 @@ export const useStore = () => {
         coachPrompt: coachPrompt || prev.coachPrompt,
         lastUpdated: Date.now()
       }));
+      setInitialLoadDone(true);
     } catch (error) {
-      console.error("Failed to load data from Supabase:", error);
+      console.error("Supabase: Failed to load data:", error);
+      // If we fall through here, we might want to try again or show an error
     } finally {
       setIsSyncing(false);
     }

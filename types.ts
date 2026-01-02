@@ -8,6 +8,7 @@ export interface DailyAdventure {
   task: string;
   completed: boolean;
   focusMinutes: number;
+  type?: 'DAILY' | 'WEEKLY';
 }
 
 export interface WeeklyPriority {

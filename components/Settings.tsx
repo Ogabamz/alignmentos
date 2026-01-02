@@ -4,7 +4,7 @@ import { useStore } from '../store';
 
 const Settings: React.FC<{ store: ReturnType<typeof useStore> }> = ({ store }) => {
   const [urlInput, setUrlInput] = useState(store.syncUrl);
-  
+
   // Quest Edit State
   const [questOutcome, setQuestOutcome] = useState(store.state.quarterlyQuest.businessOutcome);
   const [questRevenue, setQuestRevenue] = useState(store.state.quarterlyQuest.revenueTarget.toString());
@@ -56,22 +56,40 @@ const Settings: React.FC<{ store: ReturnType<typeof useStore> }> = ({ store }) =
         </p>
       </header>
 
-      {/* Cloud Sync Section */}
+      {/* Supabase Connectivity Section */}
       <section className="bg-white rounded-3xl p-6 border-2 border-slate-100 shadow-sm">
-        <h3 className="text-xs font-black uppercase text-blue-600 tracking-widest mb-4">1. Connectivity</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-black uppercase text-blue-600 tracking-widest">1. Cloud Sync (Supabase)</h3>
+          <div className={`px-2 py-1 rounded text-[10px] font-black uppercase ${import.meta.env.VITE_SUPABASE_URL ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+            {import.meta.env.VITE_SUPABASE_URL ? 'CONNECTED' : 'DISCONNECTED'}
+          </div>
+        </div>
+
         <div className="space-y-4">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-tighter">Google Apps Script URL</p>
-          <input
-            type="text"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-mono focus:outline-none focus:border-blue-500 transition-all"
-          />
+          <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-2">
+            <div className="flex justify-between text-[10px] font-bold">
+              <span className="text-slate-400">ENDPOINT:</span>
+              <span className="text-slate-600 font-mono truncate ml-4">
+                {import.meta.env.VITE_SUPABASE_URL || 'Not Configured'}
+              </span>
+            </div>
+            <div className="flex justify-between text-[10px] font-bold">
+              <span className="text-slate-400">ANON KEY:</span>
+              <span className="text-slate-600 font-mono">
+                {import.meta.env.VITE_SUPABASE_ANON_KEY ? '••••••••' : 'Missing'}
+              </span>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-slate-500 italic pb-2">
+            To secure your connection, ensure these keys are added to your environment or GitHub Secrets.
+          </p>
+
           <button
-            onClick={handleSaveSyncUrl}
+            onClick={() => store.pullFromCloud()}
             className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all"
           >
-            UPDATE CONNECTION
+            FORCE SYNC NOW
           </button>
         </div>
       </section>
@@ -106,7 +124,7 @@ const Settings: React.FC<{ store: ReturnType<typeof useStore> }> = ({ store }) =
               className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 text-sm font-black text-emerald-600 mt-1"
             />
           </div>
-          
+
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Personal Goals</label>
             <div className="space-y-2 mt-2">
@@ -125,7 +143,7 @@ const Settings: React.FC<{ store: ReturnType<typeof useStore> }> = ({ store }) =
                   className="flex-1 bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 text-sm"
                   onKeyDown={(e) => e.key === 'Enter' && handleAddGoal()}
                 />
-                <button 
+                <button
                   onClick={handleAddGoal}
                   className="bg-slate-200 text-slate-700 px-4 rounded-xl font-bold text-lg"
                 >

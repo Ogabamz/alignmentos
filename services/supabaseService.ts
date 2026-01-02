@@ -1,14 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
-import { AppState, Adventure, FinancialRecord, QuarterlyQuest } from '../types';
+import { AppState, DailyAdventure, FinancialRecord, QuarterlyQuest } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+console.log("Supabase Client Init - URL:", supabaseUrl ? "Present" : "MISSING");
+console.log("Supabase Client Init - Key:", supabaseKey ? "Present" : "MISSING");
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error("CRITICAL: Supabase environment variables are missing! Data will not persist.");
+}
+
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder');
 
 export const supabaseService = {
     // --- TASKS ---
-    async loadTasks(): Promise<Adventure[]> {
+    async loadTasks(): Promise<DailyAdventure[]> {
         const { data, error } = await supabase
             .from('daily_adventures')
             .select('*')
@@ -18,10 +25,12 @@ export const supabaseService = {
 
         return data.map((row: any) => ({
             id: row.id,
-            text: row.text,
+            task: row.text,
             completed: row.completed,
             userId: row.user_id,
-            type: row.type || 'DAILY' // Handle migration defaults
+            date: row.date,
+            focusMinutes: row.focus_minutes || 0,
+            type: row.type || 'DAILY'
         }));
     },
 
@@ -72,7 +81,7 @@ export const supabaseService = {
 
         return data.map((row: any) => ({
             id: row.id,
-            description: row.description,
+            notes: row.description,
             amount: Number(row.amount),
             type: row.type,
             category: row.category || 'General',
@@ -85,7 +94,7 @@ export const supabaseService = {
         const { data, error } = await supabase
             .from('financials')
             .insert([{
-                description: record.description,
+                description: record.notes,
                 amount: record.amount,
                 type: record.type,
                 category: record.category,
