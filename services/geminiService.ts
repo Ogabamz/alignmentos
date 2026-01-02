@@ -20,7 +20,7 @@ export const getCoachAdvice = async (state: AppState) => {
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-pro",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         temperature: 0.8
