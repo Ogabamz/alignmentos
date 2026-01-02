@@ -1,5 +1,20 @@
 import { AppState } from "../types";
 
+// Diagnostic tool to help find the right model name
+const listAvailableModels = async (apiKey: string) => {
+    try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        const data = await res.json();
+        console.log("--- AI DIAGNOSTICS ---");
+        console.log("Valid Models for this key:", data.models?.map((m: any) => m.name.replace('models/', '')) || "None found");
+        console.log("----------------------");
+    } catch (e) {
+        console.error("Failed to list models:", e);
+    }
+};
+
+let diagnosticDone = false;
+
 export const getCoachAdvice = async (state: AppState) => {
     const husbandDaily = state.dailyAdventures.filter(a => a.userId === 'HUSBAND').slice(-5);
     const wifeDaily = state.dailyAdventures.filter(a => a.userId === 'WIFE').slice(-5);
@@ -16,13 +31,19 @@ export const getCoachAdvice = async (state: AppState) => {
         const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
         console.log("Using API Key:", apiKey ? "FOUND" : "MISSING");
 
-        // Try v1 endpoint as it is more stable for general models
-        const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        if (!diagnosticDone && apiKey) {
+            listAvailableModels(apiKey);
+            diagnosticDone = true;
+        }
+
+        // Using user-provided curl structure: v1beta + X-goog-api-key header
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`;
 
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-goog-api-key': apiKey
             },
             body: JSON.stringify({
                 "contents": [{
